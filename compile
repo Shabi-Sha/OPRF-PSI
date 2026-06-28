@@ -1,17 +1,47 @@
 #!/bin/bash
+# Reproduzierbarer Build auf modernem Linux (getestet: Ubuntu 22.04, gcc 11, glibc 2.35).
+# Zwei Altlasten-Fixes gegenueber dem Original-Skript:
+#   1) Boost-Download lag auf dl.bintray.com (seit 2021 abgeschaltet, 404)
+#      -> offizielles Archiv archives.boost.io
+#   2) Boost 1.69 baut boost::thread nicht auf glibc >= 2.34: PTHREAD_STACK_MIN ist dort
+#      kein Compile-Zeit-Konstante mehr -> Praeprozessor #if -> #ifdef (Vergleich zur Laufzeit)
+#
+# Vorausgesetzte Pakete: build-essential cmake nasm wget bzip2 git
+
+set -e
 
 cd ..
-git clone --recursive https://github.com/osu-crypto/libOTe.git
+if [ ! -d libOTe ]; then
+    git clone --recursive https://github.com/osu-crypto/libOTe.git
+fi
 cd libOTe
 git checkout a2bc326
 cd cryptoTools
 git checkout 2607541
 cd thirdparty/linux
+
+# Fix 1: tote bintray-URL ersetzen (falls all.get/boost.get noch darauf zeigt)
+sed -i 's#https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.bz2#https://archives.boost.io/release/1.69.0/source/boost_1_69_0.tar.bz2#' boost.get
+rm -f boost_1_69_0.tar.bz2
+
+# Boost vorab herunterladen + entpacken, damit wir VOR dem Build patchen koennen
+if [ ! -d boost ]; then
+    wget -c 'https://archives.boost.io/release/1.69.0/source/boost_1_69_0.tar.bz2' -O ./boost_1_69_0.tar.bz2
+    tar xfj boost_1_69_0.tar.bz2
+    mv boost_1_69_0 boost
+    rm boost_1_69_0.tar.bz2
+fi
+
+# Fix 2: PTHREAD_STACK_MIN-Patch fuer glibc >= 2.34
+sed -i 's/#if PTHREAD_STACK_MIN > 0/#ifdef PTHREAD_STACK_MIN/' boost/boost/thread/pthread/thread_data.hpp
+
+# all.get: boost.get sieht boost/ schon da -> baut nur (gepatcht); miracl.get klont + baut
 bash all.get
+
 cd ../../..
 cmake -D ENABLE_MIRACL=ON .
-make
+make -j"$(nproc)"
+
 cd ../OPRF-PSI
 cmake .
-make
-
+make -j"$(nproc)"
