@@ -24,6 +24,7 @@ u64 logHeight;
 u64 hashLengthInBytes;
 u64 bucket, bucket1, bucket2;
 string ip;
+string outPrefix;
 
 
 void runSender() {
@@ -38,7 +39,7 @@ void runSender() {
 	}
 	
 	PsiSender psiSender;
-	psiSender.run(prng, ch, commonSeed, senderSize, receiverSize, height, logHeight, width, senderSet, hashLengthInBytes, 32, bucket1, bucket2);
+	psiSender.run(prng, ch, commonSeed, senderSize, receiverSize, height, logHeight, width, senderSet, hashLengthInBytes, 32, bucket1, bucket2, outPrefix);
 	
 	ch.close();
 	ep.stop();
@@ -62,7 +63,7 @@ void runReceiver() {
 	}
 	
 	PsiReceiver psiReceiver;
-	psiReceiver.run(prng, ch, commonSeed, senderSize, receiverSize, height, logHeight, width, receiverSet, hashLengthInBytes, 32, bucket1, bucket2);
+	psiReceiver.run(prng, ch, commonSeed, senderSize, receiverSize, height, logHeight, width, receiverSet, hashLengthInBytes, 32, bucket1, bucket2, outPrefix);
 	
 	ch.close();
 	ep.stop();
@@ -95,7 +96,10 @@ int main(int argc, char** argv) {
 	
 	cmd.setDefault("ip", "localhost");
 	ip = cmd.get<string>("ip");
-	
+
+	cmd.setDefault("out", "oprf_psi");
+	outPrefix = cmd.get<string>("out");
+
 	bucket1 = bucket2 = 1 << 8;
 	
 	bool noneSet = !cmd.isSet("r");
